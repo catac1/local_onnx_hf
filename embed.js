@@ -3,8 +3,7 @@ import path from 'node:path';
 import clipboardy from 'clipboardy';
 import { AutoModel, AutoTokenizer, env } from '@xenova/transformers';
 
-const MODEL_DIR = './krsbert-onnx';
-const MODEL_ID = 'krsbert-onnx';
+const DEFAULT_MODEL_DIR = './krsbert-onnx';
 const REQUIRED_MODEL_FILES = [
   'model.onnx',
   'config.json',
@@ -16,6 +15,67 @@ const REQUIRED_MODEL_FILES = [
 env.allowRemoteModels = false;
 env.allowLocalModels = true;
 env.localModelPath = path.resolve('.');
+
+function parseArgs(argv) {
+  const textParts = [];
+  let modelDir = DEFAULT_MODEL_DIR;
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+
+    if (arg === '--help' || arg === '-h') {
+      return { help: true, modelDir, text: '' };
+    }
+
+    if (arg === '--model' || arg === '-m') {
+      const value = argv[index + 1];
+
+      if (!value) {
+        throw new Error('Missing value for --model.');
+      }
+
+      modelDir = value;
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith('--model=')) {
+      modelDir = arg.slice('--model='.length);
+      continue;
+    }
+
+    textParts.push(arg);
+  }
+
+  return {
+    help: false,
+    modelDir,
+    text: textParts.join(' ').trim(),
+  };
+}
+
+function getUsage() {
+  return [
+    'Usage:',
+    '  node embed.js "페라트라정"',
+    '  node embed.js --model ./other-model-onnx "페라트라정"',
+  ].join('\n');
+}
+
+function resolveModel(modelDir) {
+  const absoluteModelDir = path.resolve(modelDir);
+  const relativeModelId = path.relative(env.localModelPath, absoluteModelDir);
+
+  if (relativeModelId.startsWith('..') || path.isAbsolute(relativeModelId)) {
+    throw new Error('Model directory must be inside the current project directory.');
+  }
+
+  return {
+    displayDir: modelDir,
+    absoluteDir: absoluteModelDir,
+    modelId: relativeModelId.replaceAll(path.sep, '/'),
+  };
+}
 
 async function assertLocalModelFiles(modelDir) {
   const missing = [];
@@ -35,9 +95,10 @@ async function assertLocalModelFiles(modelDir) {
         '',
         'Export the model locally first:',
         'optimum-cli export onnx \\',
-        '  --model snunlp/KR-SBERT-V40K-klueNLI-augSTS \\',
+        '  --model <hugging-face-model-id> \\',
         '  --task feature-extraction \\',
-        '  krsbert-onnx',
+        '  --library-name transformers \\',
+        `  ${modelDir}`,
       ].join('\n'),
     );
   }
@@ -106,18 +167,25 @@ function l2Normalize(vector) {
 }
 
 async function main() {
-  const text = process.argv.slice(2).join(' ').trim();
+  const { help, modelDir, text } = parseArgs(process.argv.slice(2));
 
-  if (!text) {
-    throw new Error('Usage: node embed.js "페라트라정"');
+  if (help) {
+    console.log(getUsage());
+    return;
   }
 
-  await assertLocalModelFiles(MODEL_DIR);
+  if (!text) {
+    throw new Error(getUsage());
+  }
 
-  const tokenizer = await AutoTokenizer.from_pretrained(MODEL_ID, {
+  const modelRef = resolveModel(modelDir);
+
+  await assertLocalModelFiles(modelRef.absoluteDir);
+
+  const tokenizer = await AutoTokenizer.from_pretrained(modelRef.modelId, {
     local_files_only: true,
   });
-  const model = await AutoModel.from_pretrained(MODEL_ID, {
+  const model = await AutoModel.from_pretrained(modelRef.modelId, {
     local_files_only: true,
     quantized: false,
     model_file_name: '../model',
@@ -143,7 +211,7 @@ async function main() {
   await clipboardy.write(JSON.stringify(embedding));
 
   console.log(`Text      : ${text}`);
-  console.log(`Model     : ${MODEL_DIR}`);
+  console.log(`Model     : ${modelRef.displayDir}`);
   console.log(`Dimension : ${embedding.length}`);
   console.log(`Embedding : [${preview.join(', ')}, ...]`);
   console.log('Full embedding copied to clipboard.');

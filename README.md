@@ -121,6 +121,40 @@ Full embedding copied to clipboard.
 
 Only the first 10 embedding values are printed. The full embedding is copied to the clipboard as a JSON array.
 
+## Use a Different Hugging Face Model
+
+Export the other model into its own local ONNX directory:
+
+```bash
+optimum-cli export onnx \
+  --model <hugging-face-model-id> \
+  --task feature-extraction \
+  --library-name transformers \
+  other-model-onnx
+```
+
+Then choose that model in a single `embed.js` command:
+
+```bash
+node embed.js --model ./other-model-onnx "페라트라정"
+```
+
+The short form is also supported:
+
+```bash
+node embed.js -m ./other-model-onnx "페라트라정"
+```
+
+The model directory must be inside this project directory and contain:
+
+```text
+model.onnx
+config.json
+tokenizer.json
+tokenizer_config.json
+special_tokens_map.json
+```
+
 ## Troubleshooting
 
 If `node_modules/` is missing:
