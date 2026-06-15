@@ -121,6 +121,49 @@ Full embedding copied to clipboard.
 
 Only the first 10 embedding values are printed. The full embedding is copied to the clipboard as a JSON array.
 
+## Run as a Web Service
+
+Start the local web service:
+
+```bash
+npm start
+```
+
+Then open:
+
+```text
+http://127.0.0.1:3000
+```
+
+If port `3000` is already in use, run on another port.
+
+Any shell:
+
+```bash
+node server.js --port 3001
+```
+
+Short form:
+
+```bash
+node server.js -p 3001
+```
+
+Then open:
+
+```text
+http://127.0.0.1:3001
+```
+
+The page lets you:
+
+- Enter text to embed.
+- Select an exported local ONNX model.
+- Add a new Hugging Face model by exporting it to a local directory.
+- Copy the full embedding JSON array with a button.
+
+The browser calls the local Node.js service at `/api/embed`. Inference still runs on local ONNX files.
+
 ## Use a Different Hugging Face Model
 
 Export the other model into its own local ONNX directory:

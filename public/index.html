@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Local Embeddings</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="workspace">
+        <header class="toolbar">
+          <div>
+            <h1>Local Embeddings</h1>
+            <p>ONNX inference runs on this machine.</p>
+          </div>
+          <div class="status" id="status">Ready</div>
+        </header>
+
+        <form class="input-grid" id="embed-form">
+          <label class="field field-wide">
+            <span>Input text</span>
+            <textarea id="text-input" rows="5" placeholder="페라트라정" required></textarea>
+          </label>
+
+          <label class="field">
+            <span>Selected model</span>
+            <select id="model-select"></select>
+          </label>
+
+          <div class="actions">
+            <button class="primary" id="generate-button" type="submit">Generate</button>
+            <button class="secondary" id="copy-button" type="button" disabled>Copy Full Vector</button>
+          </div>
+        </form>
+
+        <section class="model-panel">
+          <div class="section-heading">
+            <h2>Models</h2>
+            <button class="secondary compact" id="refresh-models-button" type="button">Refresh</button>
+          </div>
+
+          <form class="model-grid" id="model-form">
+            <label class="field">
+              <span>Hugging Face model ID</span>
+              <input id="hf-model-input" type="text" value="snunlp/KR-SBERT-V40K-klueNLI-augSTS" autocomplete="off">
+            </label>
+
+            <label class="field">
+              <span>Local output directory</span>
+              <input id="output-dir-input" type="text" value="./krsbert-onnx" autocomplete="off">
+            </label>
+
+            <div class="actions">
+              <button class="secondary" id="add-model-button" type="submit">Add Model</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="result-panel" aria-live="polite">
+          <div class="metrics">
+            <div>
+              <span>Dimension</span>
+              <strong id="dimension-output">-</strong>
+            </div>
+            <div>
+              <span>Model</span>
+              <strong id="model-output">-</strong>
+            </div>
+          </div>
+
+          <label class="field">
+            <span>Preview</span>
+            <output id="preview-output">Generate an embedding to see the first 10 values.</output>
+          </label>
+        </section>
+      </section>
+    </main>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
