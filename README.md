@@ -172,16 +172,22 @@ Build a Docker image under the Docker Hub namespace `catac1`:
 docker build -t catac1/krsbert-embeddings:latest .
 ```
 
-The Docker build exports this Hugging Face model into the image by default:
+The Docker image does not include model weights. This keeps the image smaller and avoids downloading from Hugging Face during `docker build`.
 
-```text
-snunlp/KR-SBERT-V40K-klueNLI-augSTS
+Create a local folder for exported models:
+
+PowerShell:
+
+```powershell
+mkdir models
+docker run --rm -p 3000:3000 -v "${PWD}\models:/app/models" catac1/krsbert-embeddings:latest
 ```
 
-Run the container:
+cmd.exe:
 
-```bash
-docker run --rm -p 3000:3000 catac1/krsbert-embeddings:latest
+```cmd
+mkdir models
+docker run --rm -p 3000:3000 -v "%cd%\models:/app/models" catac1/krsbert-embeddings:latest
 ```
 
 Then open:
@@ -190,24 +196,33 @@ Then open:
 http://127.0.0.1:3000
 ```
 
-Push to Docker Hub:
+In the page, use **Add Model**:
+
+```text
+Hugging Face model ID : snunlp/KR-SBERT-V40K-klueNLI-augSTS
+Volume output directory: ./models/krsbert-onnx
+```
+
+The container downloads and exports the model into `/app/models/krsbert-onnx`, which is mapped to your local `models/` folder.
+The server rejects web-added model output paths outside `./models/` so Docker exports are not accidentally written only inside the container filesystem.
+
+After export finishes, select `models/krsbert-onnx` in the model selector and generate embeddings.
+
+Push the image to Docker Hub:
 
 ```bash
 docker push catac1/krsbert-embeddings:latest
 ```
 
-To build the image with a different Hugging Face model, pass build arguments:
-
-```bash
-docker build \
-  --build-arg HF_MODEL_ID=<hugging-face-model-id> \
-  --build-arg MODEL_DIR=custom-model-onnx \
-  -t catac1/krsbert-embeddings:custom-model .
-```
-
 The web service inside Docker listens on `0.0.0.0:3000`, so Docker port mapping works with `-p 3000:3000`.
 
-Models added from the webpage inside a running container are written to the container filesystem. Use a volume if you want added models to survive container removal:
+To run on another host port:
+
+```bash
+docker run --rm -p 3001:3000 -v "${PWD}\models:/app/models" catac1/krsbert-embeddings:latest
+```
+
+You can also use a named Docker volume instead of a local folder:
 
 ```bash
 docker run --rm \

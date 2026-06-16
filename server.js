@@ -7,6 +7,7 @@ import { createEmbedding, DEFAULT_MODEL_DIR, isLocalModelDir, resolveModel } fro
 const DEFAULT_HOST = '127.0.0.1';
 const DEFAULT_PORT = 3000;
 const PUBLIC_DIR = path.resolve('public');
+const MODEL_STORAGE_DIR = path.resolve(process.env.MODEL_STORAGE_DIR ?? './models');
 
 const MIME_TYPES = new Map([
   ['.html', 'text/html; charset=utf-8'],
@@ -103,6 +104,33 @@ function getModelNameFromDir(modelDir) {
   return modelDir.replaceAll('\\', '/').replace(/^\.\//, '');
 }
 
+function isErrorCode(error, code) {
+  return error instanceof Error && 'code' in error && error.code === code;
+}
+
+function isInsideDirectory(parentDir, childDir) {
+  const relativePath = path.relative(parentDir, childDir);
+  return relativePath === '' || (!relativePath.startsWith('..') && !path.isAbsolute(relativePath));
+}
+
+function getProjectRelativeDir(absoluteDir) {
+  return `./${path.relative(process.cwd(), absoluteDir).replaceAll(path.sep, '/')}`;
+}
+
+function assertWebModelOutputDir(outputDir) {
+  const modelRef = resolveModel(outputDir);
+
+  if (!isInsideDirectory(MODEL_STORAGE_DIR, modelRef.absoluteDir)) {
+    const storageDir = getProjectRelativeDir(MODEL_STORAGE_DIR);
+
+    throw new Error(
+      `Models added from the web page must be saved under ${storageDir}/ so Docker volume mapping persists them on the host.`,
+    );
+  }
+
+  return modelRef;
+}
+
 async function readJsonBody(request) {
   const chunks = [];
 
@@ -182,7 +210,7 @@ async function listModels() {
       }
     }
   } catch (error) {
-    if (!(error instanceof Error) || !('code' in error) || error.code !== 'ENOENT') {
+    if (!isErrorCode(error, 'ENOENT')) {
       throw error;
     }
   }
@@ -214,13 +242,15 @@ async function handleModels(request, response) {
     throw new Error('Output directory is required.');
   }
 
-  const modelRef = resolveModel(outputDir);
+  await fs.mkdir(MODEL_STORAGE_DIR, { recursive: true });
+
+  const modelRef = assertWebModelOutputDir(outputDir);
 
   try {
     await fs.access(modelRef.absoluteDir);
     throw new Error(`Output directory already exists: ${outputDir}`);
   } catch (error) {
-    if (error instanceof Error && 'code' in error && error.code !== 'ENOENT') {
+    if (!isErrorCode(error, 'ENOENT')) {
       throw error;
     }
   }
@@ -230,7 +260,7 @@ async function handleModels(request, response) {
   sendJson(response, 201, {
     model: {
       name: getModelNameFromDir(outputDir),
-      dir: outputDir,
+      dir: modelRef.displayDir,
     },
     models: await listModels(),
   });
