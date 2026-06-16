@@ -164,6 +164,64 @@ The page lets you:
 
 The browser calls the local Node.js service at `/api/embed`. Inference still runs on local ONNX files.
 
+## Docker
+
+Build a Docker image under the Docker Hub namespace `catac1`:
+
+```bash
+docker build -t catac1/krsbert-embeddings:latest .
+```
+
+The Docker build exports this Hugging Face model into the image by default:
+
+```text
+snunlp/KR-SBERT-V40K-klueNLI-augSTS
+```
+
+Run the container:
+
+```bash
+docker run --rm -p 3000:3000 catac1/krsbert-embeddings:latest
+```
+
+Then open:
+
+```text
+http://127.0.0.1:3000
+```
+
+Push to Docker Hub:
+
+```bash
+docker push catac1/krsbert-embeddings:latest
+```
+
+To build the image with a different Hugging Face model, pass build arguments:
+
+```bash
+docker build \
+  --build-arg HF_MODEL_ID=<hugging-face-model-id> \
+  --build-arg MODEL_DIR=custom-model-onnx \
+  -t catac1/krsbert-embeddings:custom-model .
+```
+
+The web service inside Docker listens on `0.0.0.0:3000`, so Docker port mapping works with `-p 3000:3000`.
+
+Models added from the webpage inside a running container are written to the container filesystem. Use a volume if you want added models to survive container removal:
+
+```bash
+docker run --rm \
+  -p 3000:3000 \
+  -v embedding-models:/app/models \
+  catac1/krsbert-embeddings:latest
+```
+
+When using that volume, add models from the page with output directories like:
+
+```text
+./models/my-model-onnx
+```
+
 ## Use a Different Hugging Face Model
 
 Export the other model into its own local ONNX directory:

@@ -1,5 +1,8 @@
+.git/
 node_modules/
 krsbert-onnx/
 models/
 server.out.log
 server.err.log
+npm-debug.log*
+.DS_Store

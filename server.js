@@ -4,7 +4,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { createEmbedding, DEFAULT_MODEL_DIR, isLocalModelDir, resolveModel } from './embed-core.js';
 
-const HOST = '127.0.0.1';
+const DEFAULT_HOST = '127.0.0.1';
 const DEFAULT_PORT = 3000;
 const PUBLIC_DIR = path.resolve('public');
 
@@ -17,6 +17,7 @@ const MIME_TYPES = new Map([
 ]);
 
 function parseArgs(argv) {
+  let host = process.env.HOST ?? DEFAULT_HOST;
   let port = Number(process.env.PORT ?? DEFAULT_PORT);
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -24,6 +25,23 @@ function parseArgs(argv) {
 
     if (arg === '--help' || arg === '-h') {
       return { help: true, port };
+    }
+
+    if (arg === '--host') {
+      const value = argv[index + 1];
+
+      if (!value) {
+        throw new Error('Missing value for --host.');
+      }
+
+      host = value;
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith('--host=')) {
+      host = arg.slice('--host='.length);
+      continue;
     }
 
     if (arg === '--port' || arg === '-p') {
@@ -50,19 +68,24 @@ function parseArgs(argv) {
     throw new Error('Port must be an integer from 1 to 65535.');
   }
 
-  return { help: false, port };
+  if (!host) {
+    throw new Error('Host is required.');
+  }
+
+  return { help: false, host, port };
 }
 
 function getUsage() {
   return [
     'Usage:',
     '  node server.js',
+    '  node server.js --host 0.0.0.0 --port 3000',
     '  node server.js --port 3001',
     '  node server.js -p 3001',
   ].join('\n');
 }
 
-const { help, port: PORT } = parseArgs(process.argv.slice(2));
+const { help, host: HOST, port: PORT } = parseArgs(process.argv.slice(2));
 
 if (help) {
   console.log(getUsage());
@@ -124,8 +147,18 @@ async function handleEmbed(request, response) {
 }
 
 async function listModels() {
-  const entries = await fs.readdir('.', { withFileTypes: true });
   const models = [];
+
+  async function addModelIfValid(modelDir) {
+    if (await isLocalModelDir(path.resolve(modelDir))) {
+      models.push({
+        name: getModelNameFromDir(modelDir),
+        dir: modelDir,
+      });
+    }
+  }
+
+  const entries = await fs.readdir('.', { withFileTypes: true });
 
   for (const entry of entries) {
     if (!entry.isDirectory()) {
@@ -137,12 +170,20 @@ async function listModels() {
     }
 
     const modelDir = `./${entry.name}`;
+    await addModelIfValid(modelDir);
+  }
 
-    if (await isLocalModelDir(path.resolve(modelDir))) {
-      models.push({
-        name: getModelNameFromDir(modelDir),
-        dir: modelDir,
-      });
+  try {
+    const modelEntries = await fs.readdir('./models', { withFileTypes: true });
+
+    for (const entry of modelEntries) {
+      if (entry.isDirectory()) {
+        await addModelIfValid(`./models/${entry.name}`);
+      }
+    }
+  } catch (error) {
+    if (!(error instanceof Error) || !('code' in error) || error.code !== 'ENOENT') {
+      throw error;
     }
   }
 

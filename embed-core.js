@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { AutoModel, AutoTokenizer, env } from '@xenova/transformers';
 
-export const DEFAULT_MODEL_DIR = './krsbert-onnx';
+export const DEFAULT_MODEL_DIR = process.env.DEFAULT_MODEL_DIR ?? './krsbert-onnx';
 
 export const REQUIRED_MODEL_FILES = [
   'model.onnx',
