@@ -84,9 +84,13 @@
       <form method="dialog">
         <h2>Delete model?</h2>
         <p id="delete-dialog-text">This model directory will be removed.</p>
+        <label class="field">
+          <span>Type model name to confirm</span>
+          <input id="delete-confirm-input" type="text" autocomplete="off">
+        </label>
         <div class="dialog-actions">
           <button class="secondary" id="cancel-delete-button" value="cancel" type="submit">Cancel</button>
-          <button class="danger" id="confirm-delete-button" value="delete" type="button">Delete</button>
+          <button class="danger" id="confirm-delete-button" value="delete" type="button" disabled>Delete</button>
         </div>
       </form>
     </dialog>

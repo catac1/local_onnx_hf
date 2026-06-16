@@ -60,6 +60,34 @@ export async function assertLocalModelFiles(modelDir) {
   }
 }
 
+export async function ensureTransformersJsModelLayout(modelDir) {
+  await assertLocalModelFiles(modelDir);
+
+  const rootModelPath = path.join(modelDir, 'model.onnx');
+  const onnxDir = path.join(modelDir, 'onnx');
+  const transformersModelPath = path.join(onnxDir, 'model.onnx');
+
+  try {
+    await fs.access(transformersModelPath);
+    return;
+  } catch {
+    // Transformers.js looks for onnx/model.onnx by default. Optimum exports
+    // model.onnx at the output root, so create a compatible path after export.
+  }
+
+  await fs.mkdir(onnxDir, { recursive: true });
+
+  try {
+    await fs.link(rootModelPath, transformersModelPath);
+  } catch (error) {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'EEXIST') {
+      return;
+    }
+
+    await fs.copyFile(rootModelPath, transformersModelPath);
+  }
+}
+
 export async function isLocalModelDir(modelDir) {
   try {
     await assertLocalModelFiles(modelDir);
@@ -138,7 +166,7 @@ async function loadLocalModel(modelRef) {
     return cached;
   }
 
-  await assertLocalModelFiles(modelRef.absoluteDir);
+  await ensureTransformersJsModelLayout(modelRef.absoluteDir);
 
   const loaded = {
     tokenizer: await AutoTokenizer.from_pretrained(modelRef.modelId, {
@@ -147,7 +175,6 @@ async function loadLocalModel(modelRef) {
     model: await AutoModel.from_pretrained(modelRef.modelId, {
       local_files_only: true,
       quantized: false,
-      model_file_name: '../model',
     }),
   };
 

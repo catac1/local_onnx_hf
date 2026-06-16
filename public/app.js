@@ -15,17 +15,24 @@ const modelOutput = document.querySelector('#model-output');
 const previewOutput = document.querySelector('#preview-output');
 const deleteDialog = document.querySelector('#delete-dialog');
 const deleteDialogText = document.querySelector('#delete-dialog-text');
+const deleteConfirmInput = document.querySelector('#delete-confirm-input');
 const confirmDeleteButton = document.querySelector('#confirm-delete-button');
 
 let currentEmbeddingJson = '';
 let currentModels = [];
+let isGenerating = false;
 
 function selectedModelDir() {
-  return modelSelect.value || './krsbert-onnx';
+  return modelSelect.value;
 }
 
 function selectedModel() {
   return currentModels.find((model) => model.dir === selectedModelDir()) || null;
+}
+
+function updateDeleteConfirmation() {
+  const model = selectedModel();
+  confirmDeleteButton.disabled = deleteConfirmInput.value !== model?.name;
 }
 
 function setStatus(message, type = '') {
@@ -34,7 +41,8 @@ function setStatus(message, type = '') {
 }
 
 function setBusy(isBusy) {
-  generateButton.disabled = isBusy;
+  isGenerating = isBusy;
+  generateButton.disabled = isBusy || !selectedModel();
   generateButton.textContent = isBusy ? 'Generating...' : 'Generate';
 }
 
@@ -46,6 +54,7 @@ function setModelBusy(isBusy) {
 }
 
 function updateModelActions() {
+  generateButton.disabled = isGenerating || !selectedModel();
   deleteModelButton.disabled = !selectedModel()?.deletable;
 }
 
@@ -59,6 +68,13 @@ async function loadModels(preferredDir = '') {
 
   modelSelect.replaceChildren();
   currentModels = payload.models;
+
+  if (payload.models.length === 0) {
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = 'No models available';
+    modelSelect.append(option);
+  }
 
   for (const model of payload.models) {
     const option = document.createElement('option');
@@ -76,8 +92,15 @@ async function loadModels(preferredDir = '') {
     modelSelect.value = payload.models[0].dir;
   }
 
-  generateButton.disabled = payload.models.length === 0;
   updateModelActions();
+
+  if (payload.models.length === 0) {
+    dimensionOutput.textContent = '-';
+    modelOutput.textContent = '-';
+    previewOutput.textContent = 'No local models found. Add a model under ./models before generating embeddings.';
+    copyButton.disabled = true;
+    currentEmbeddingJson = '';
+  }
 }
 
 function renderResult(result) {
@@ -93,10 +116,15 @@ form.addEventListener('submit', async (event) => {
 
   copyButton.disabled = true;
   currentEmbeddingJson = '';
-  setBusy(true);
-  setStatus('Running');
 
   try {
+    if (!selectedModel()) {
+      throw new Error('No local model is available. Add a model under ./models first.');
+    }
+
+    setBusy(true);
+    setStatus('Running');
+
     const response = await fetch('/api/embed', {
       method: 'POST',
       headers: {
@@ -181,8 +209,20 @@ deleteModelButton.addEventListener('click', () => {
     return;
   }
 
-  deleteDialogText.textContent = `${model.dir} will be permanently removed from the mapped models volume.`;
+  deleteDialogText.textContent = `${model.dir} will be permanently removed from the mapped models volume. Type "${model.name}" exactly to confirm.`;
+  deleteConfirmInput.value = '';
+  confirmDeleteButton.disabled = true;
   deleteDialog.showModal();
+  deleteConfirmInput.focus();
+});
+
+deleteConfirmInput.addEventListener('input', () => {
+  updateDeleteConfirmation();
+});
+
+deleteDialog.addEventListener('close', () => {
+  deleteConfirmInput.value = '';
+  confirmDeleteButton.disabled = true;
 });
 
 confirmDeleteButton.addEventListener('click', async () => {
@@ -190,6 +230,11 @@ confirmDeleteButton.addEventListener('click', async () => {
 
   if (!model?.deletable) {
     deleteDialog.close();
+    return;
+  }
+
+  if (deleteConfirmInput.value !== model.name) {
+    updateDeleteConfirmation();
     return;
   }
 

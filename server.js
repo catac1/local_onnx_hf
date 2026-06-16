@@ -2,7 +2,14 @@ import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { createEmbedding, DEFAULT_MODEL_DIR, forgetLocalModel, isLocalModelDir, resolveModel } from './embed-core.js';
+import {
+  createEmbedding,
+  DEFAULT_MODEL_DIR,
+  ensureTransformersJsModelLayout,
+  forgetLocalModel,
+  isLocalModelDir,
+  resolveModel,
+} from './embed-core.js';
 
 const DEFAULT_HOST = '127.0.0.1';
 const DEFAULT_PORT = 3000;
@@ -285,6 +292,7 @@ async function handleAddModel(request, response) {
   }
 
   await exportModel(modelId, modelRef.absoluteDir);
+  await ensureTransformersJsModelLayout(modelRef.absoluteDir);
 
   sendJson(response, 201, {
     model: {

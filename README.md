@@ -170,7 +170,7 @@ The browser calls the local Node.js service at `/api/embed`. Inference still run
 Build a Docker image under the Docker Hub namespace `catac1`:
 
 ```bash
-docker build -t catac1/krsbert-embeddings:latest .
+docker build -t catac1/hf-generate-embeddings:latest .
 ```
 
 The Docker image does not include model weights. This keeps the image smaller and avoids downloading from Hugging Face during `docker build`.
@@ -181,14 +181,14 @@ PowerShell:
 
 ```powershell
 mkdir models
-docker run --rm -p 3000:3000 -v "${PWD}\models:/app/models" catac1/krsbert-embeddings:latest
+docker run --rm -p 3000:3000 -v "${PWD}\models:/app/models" catac1/hf-generate-embeddings:latest
 ```
 
 cmd.exe:
 
 ```cmd
 mkdir models
-docker run --rm -p 3000:3000 -v "%cd%\models:/app/models" catac1/krsbert-embeddings:latest
+docker run --rm -p 3000:3000 -v "%cd%\models:/app/models" catac1/hf-generate-embeddings:latest
 ```
 
 Then open:
@@ -197,6 +197,8 @@ Then open:
 http://127.0.0.1:3000
 ```
 
+On first Docker run, the mounted `models/` folder can be empty. The page will show `No models available`, and `Generate` stays disabled until you add a model.
+
 In the page, use **Add Model**:
 
 ```text
@@ -204,16 +206,18 @@ Hugging Face model ID : snunlp/KR-SBERT-V40K-klueNLI-augSTS
 Volume output directory: ./models/krsbert-onnx
 ```
 
+Inside Docker, `./models/krsbert-onnx` resolves to `/app/models/krsbert-onnx`. You can also type the absolute container path `/app/models/krsbert-onnx` in the web page.
+
 The container downloads and exports the model into `/app/models/krsbert-onnx`, which is mapped to your local `models/` folder.
 The server rejects web-added model output paths outside `./models/` so Docker exports are not accidentally written only inside the container filesystem.
 
 After export finishes, select `models/krsbert-onnx` in the model selector and generate embeddings.
-Models stored under `./models/` can also be deleted from the page. A confirmation dialog is shown before deletion, and the removed directory disappears from the mapped host folder.
+Models stored under `./models/` can also be deleted from the page. A confirmation dialog is shown before deletion, and the user must type the exact model name before the delete button is enabled. The removed directory disappears from the mapped host folder.
 
 Push the image to Docker Hub:
 
 ```bash
-docker push catac1/krsbert-embeddings:latest
+docker push catac1/hf-generate-embeddings:latest
 ```
 
 The web service inside Docker listens on `0.0.0.0:3000`, so Docker port mapping works with `-p 3000:3000`.
@@ -221,7 +225,7 @@ The web service inside Docker listens on `0.0.0.0:3000`, so Docker port mapping 
 To run on another host port:
 
 ```bash
-docker run --rm -p 3001:3000 -v "${PWD}\models:/app/models" catac1/krsbert-embeddings:latest
+docker run --rm -p 3001:3000 -v "${PWD}\models:/app/models" catac1/hf-generate-embeddings:latest
 ```
 
 You can also use a named Docker volume instead of a local folder:
@@ -230,7 +234,7 @@ You can also use a named Docker volume instead of a local folder:
 docker run --rm \
   -p 3000:3000 \
   -v embedding-models:/app/models \
-  catac1/krsbert-embeddings:latest
+  catac1/hf-generate-embeddings:latest
 ```
 
 When using that volume, add models from the page with output directories like:
