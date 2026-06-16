@@ -160,6 +160,7 @@ The page lets you:
 - Enter text to embed.
 - Select an exported local ONNX model.
 - Add a new Hugging Face model by exporting it to a local directory.
+- Delete models stored under `./models/` after a confirmation dialog.
 - Copy the full embedding JSON array with a button.
 
 The browser calls the local Node.js service at `/api/embed`. Inference still runs on local ONNX files.
@@ -207,6 +208,7 @@ The container downloads and exports the model into `/app/models/krsbert-onnx`, w
 The server rejects web-added model output paths outside `./models/` so Docker exports are not accidentally written only inside the container filesystem.
 
 After export finishes, select `models/krsbert-onnx` in the model selector and generate embeddings.
+Models stored under `./models/` can also be deleted from the page. A confirmation dialog is shown before deletion, and the removed directory disappears from the mapped host folder.
 
 Push the image to Docker Hub:
 

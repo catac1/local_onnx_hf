@@ -2,7 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { createEmbedding, DEFAULT_MODEL_DIR, isLocalModelDir, resolveModel } from './embed-core.js';
+import { createEmbedding, DEFAULT_MODEL_DIR, forgetLocalModel, isLocalModelDir, resolveModel } from './embed-core.js';
 
 const DEFAULT_HOST = '127.0.0.1';
 const DEFAULT_PORT = 3000;
@@ -113,6 +113,11 @@ function isInsideDirectory(parentDir, childDir) {
   return relativePath === '' || (!relativePath.startsWith('..') && !path.isAbsolute(relativePath));
 }
 
+function isStrictChildDirectory(parentDir, childDir) {
+  const relativePath = path.relative(parentDir, childDir);
+  return relativePath !== '' && !relativePath.startsWith('..') && !path.isAbsolute(relativePath);
+}
+
 function getProjectRelativeDir(absoluteDir) {
   return `./${path.relative(process.cwd(), absoluteDir).replaceAll(path.sep, '/')}`;
 }
@@ -126,6 +131,18 @@ function assertWebModelOutputDir(outputDir) {
     throw new Error(
       `Models added from the web page must be saved under ${storageDir}/ so Docker volume mapping persists them on the host.`,
     );
+  }
+
+  return modelRef;
+}
+
+function assertWebModelDeleteDir(modelDir) {
+  const modelRef = resolveModel(modelDir);
+
+  if (!isStrictChildDirectory(MODEL_STORAGE_DIR, modelRef.absoluteDir)) {
+    const storageDir = getProjectRelativeDir(MODEL_STORAGE_DIR);
+
+    throw new Error(`Only model directories under ${storageDir}/ can be deleted from the web page.`);
   }
 
   return modelRef;
@@ -179,9 +196,12 @@ async function listModels() {
 
   async function addModelIfValid(modelDir) {
     if (await isLocalModelDir(path.resolve(modelDir))) {
+      const absoluteModelDir = path.resolve(modelDir);
+
       models.push({
         name: getModelNameFromDir(modelDir),
         dir: modelDir,
+        deletable: isStrictChildDirectory(MODEL_STORAGE_DIR, absoluteModelDir),
       });
     }
   }
@@ -225,11 +245,20 @@ async function handleModels(request, response) {
     return;
   }
 
-  if (request.method !== 'POST') {
-    sendJson(response, 405, { error: 'Use GET or POST /api/models.' });
+  if (request.method === 'POST') {
+    await handleAddModel(request, response);
     return;
   }
 
+  if (request.method === 'DELETE') {
+    await handleDeleteModel(request, response);
+    return;
+  }
+
+  sendJson(response, 405, { error: 'Use GET, POST, or DELETE /api/models.' });
+}
+
+async function handleAddModel(request, response) {
   const body = await readJsonBody(request);
   const modelId = typeof body.modelId === 'string' ? body.modelId.trim() : '';
   const outputDir = typeof body.outputDir === 'string' ? body.outputDir.trim() : '';
@@ -262,6 +291,32 @@ async function handleModels(request, response) {
       name: getModelNameFromDir(outputDir),
       dir: modelRef.displayDir,
     },
+    models: await listModels(),
+  });
+}
+
+async function handleDeleteModel(request, response) {
+  const body = await readJsonBody(request);
+  const modelDir = typeof body.modelDir === 'string' ? body.modelDir.trim() : '';
+
+  if (!modelDir) {
+    throw new Error('Model directory is required.');
+  }
+
+  const modelRef = assertWebModelDeleteDir(modelDir);
+
+  if (!(await isLocalModelDir(modelRef.absoluteDir))) {
+    throw new Error(`Not a valid exported model directory: ${modelDir}`);
+  }
+
+  await fs.rm(modelRef.absoluteDir, {
+    recursive: true,
+    force: false,
+  });
+  forgetLocalModel(modelRef.displayDir);
+
+  sendJson(response, 200, {
+    deleted: modelRef.displayDir,
     models: await listModels(),
   });
 }

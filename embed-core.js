@@ -188,3 +188,8 @@ export async function createEmbedding(text, modelDir = DEFAULT_MODEL_DIR) {
     preview: embedding.slice(0, 10),
   };
 }
+
+export function forgetLocalModel(modelDir) {
+  const modelRef = resolveModel(modelDir);
+  loadedModels.delete(modelRef.modelId);
+}

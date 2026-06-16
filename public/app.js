@@ -7,16 +7,25 @@ const outputDirInput = document.querySelector('#output-dir-input');
 const generateButton = document.querySelector('#generate-button');
 const addModelButton = document.querySelector('#add-model-button');
 const refreshModelsButton = document.querySelector('#refresh-models-button');
+const deleteModelButton = document.querySelector('#delete-model-button');
 const copyButton = document.querySelector('#copy-button');
 const statusOutput = document.querySelector('#status');
 const dimensionOutput = document.querySelector('#dimension-output');
 const modelOutput = document.querySelector('#model-output');
 const previewOutput = document.querySelector('#preview-output');
+const deleteDialog = document.querySelector('#delete-dialog');
+const deleteDialogText = document.querySelector('#delete-dialog-text');
+const confirmDeleteButton = document.querySelector('#confirm-delete-button');
 
 let currentEmbeddingJson = '';
+let currentModels = [];
 
 function selectedModelDir() {
   return modelSelect.value || './krsbert-onnx';
+}
+
+function selectedModel() {
+  return currentModels.find((model) => model.dir === selectedModelDir()) || null;
 }
 
 function setStatus(message, type = '') {
@@ -32,7 +41,12 @@ function setBusy(isBusy) {
 function setModelBusy(isBusy) {
   addModelButton.disabled = isBusy;
   refreshModelsButton.disabled = isBusy;
+  deleteModelButton.disabled = isBusy || !selectedModel()?.deletable;
   addModelButton.textContent = isBusy ? 'Adding...' : 'Add Model';
+}
+
+function updateModelActions() {
+  deleteModelButton.disabled = !selectedModel()?.deletable;
 }
 
 async function loadModels(preferredDir = '') {
@@ -44,11 +58,13 @@ async function loadModels(preferredDir = '') {
   }
 
   modelSelect.replaceChildren();
+  currentModels = payload.models;
 
   for (const model of payload.models) {
     const option = document.createElement('option');
     option.value = model.dir;
-    option.textContent = model.name;
+    option.textContent = model.deletable ? model.name : `${model.name} (read-only)`;
+    option.dataset.deletable = String(Boolean(model.deletable));
     modelSelect.append(option);
   }
 
@@ -61,6 +77,7 @@ async function loadModels(preferredDir = '') {
   }
 
   generateButton.disabled = payload.models.length === 0;
+  updateModelActions();
 }
 
 function renderResult(result) {
@@ -150,6 +167,65 @@ refreshModelsButton.addEventListener('click', async () => {
   } catch (error) {
     previewOutput.textContent = error instanceof Error ? error.message : 'Could not load models.';
     setStatus('Error', 'error');
+  }
+});
+
+modelSelect.addEventListener('change', () => {
+  updateModelActions();
+});
+
+deleteModelButton.addEventListener('click', () => {
+  const model = selectedModel();
+
+  if (!model?.deletable) {
+    return;
+  }
+
+  deleteDialogText.textContent = `${model.dir} will be permanently removed from the mapped models volume.`;
+  deleteDialog.showModal();
+});
+
+confirmDeleteButton.addEventListener('click', async () => {
+  const model = selectedModel();
+
+  if (!model?.deletable) {
+    deleteDialog.close();
+    return;
+  }
+
+  confirmDeleteButton.disabled = true;
+  setStatus('Deleting');
+
+  try {
+    const response = await fetch('/api/models', {
+      method: 'DELETE',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        modelDir: model.dir,
+      }),
+    });
+
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(payload.error || 'Model delete failed.');
+    }
+
+    deleteDialog.close();
+    await loadModels();
+    dimensionOutput.textContent = '-';
+    modelOutput.textContent = '-';
+    previewOutput.textContent = `Deleted ${payload.deleted}.`;
+    copyButton.disabled = true;
+    currentEmbeddingJson = '';
+    setStatus('Deleted', 'success');
+  } catch (error) {
+    previewOutput.textContent = error instanceof Error ? error.message : 'Model delete failed.';
+    setStatus('Error', 'error');
+  } finally {
+    confirmDeleteButton.disabled = false;
   }
 });
 

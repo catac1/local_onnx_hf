@@ -37,7 +37,10 @@
         <section class="model-panel">
           <div class="section-heading">
             <h2>Models</h2>
-            <button class="secondary compact" id="refresh-models-button" type="button">Refresh</button>
+            <div class="header-actions">
+              <button class="secondary compact" id="refresh-models-button" type="button">Refresh</button>
+              <button class="danger compact" id="delete-model-button" type="button" disabled>Delete Selected</button>
+            </div>
           </div>
 
           <form class="model-grid" id="model-form">
@@ -76,6 +79,17 @@
         </section>
       </section>
     </main>
+
+    <dialog class="confirm-dialog" id="delete-dialog">
+      <form method="dialog">
+        <h2>Delete model?</h2>
+        <p id="delete-dialog-text">This model directory will be removed.</p>
+        <div class="dialog-actions">
+          <button class="secondary" id="cancel-delete-button" value="cancel" type="submit">Cancel</button>
+          <button class="danger" id="confirm-delete-button" value="delete" type="button">Delete</button>
+        </div>
+      </form>
+    </dialog>
 
     <script src="/app.js" type="module"></script>
   </body>
